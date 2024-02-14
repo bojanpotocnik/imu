@@ -1,0 +1,4 @@
+# JetBrains CLion
+.idea/
+# PlatformIO IDE or plugin
+.pio/
