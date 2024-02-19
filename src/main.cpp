@@ -3,94 +3,76 @@
 
 
 /**
- * When debugging, wait a bit after boot to allow the serial monitor to be ready
+ * Initialize the serial port for `printf` usage
  *
- * @param delay_ms  Delay in milliseconds from first call to this function to it returning false.
- *
- * @return True if the delay is still ongoing, false when the specified delay has passed.
+ * @param baud        Baud rate for the serial port.
+ * @param usb_timeout Timeout in milliseconds to wait for the USB CDC serial connection to open
+ *                    on boards with native USB (otherwise this is ignored).
+ * @param usb_delay   Delay in milliseconds to wait after the USB CDC serial connection is open.
  */
-static bool boot_delay(unsigned int delay_ms = 500);
+static void init_serial(unsigned int baud = 921600, unsigned int usb_timeout = 1000, unsigned int usb_delay = 300);
 
 /**
- * Scan for I2C devices, one address each call to prevent blocking the main loop
+ * Initialize the I2C bus and optionally scan it for attached devices
  *
- * @param reset  Reset the address to 0x00.
- *
- * @return True if the scan is still ongoing, false when the scan is complete.
+ * @param scl        Pin number for the I2C SCL line.
+ * @param sda        Pin number for the I2C SDA line.
+ * @param frequency  I2C bus frequency in Hz.
+ * @param scan       If true, scan the I2C bus for attached devices.
  */
-static bool i2c_scan_loop(bool reset = false);
-
-
-static const int PIN_SDA = 43;
-static const int PIN_SCL = 44;
+static void init_i2c(uint8_t scl, uint8_t sda, uint32_t frequency, bool scan = false);
 
 
 void setup()
 {
-    Serial.begin(921600);
-    Wire.begin(PIN_SDA, PIN_SCL, 400000);
+    init_serial();
+    init_i2c(44, 43, 400000, true);
 }
 
 void loop()
 {
-    if (boot_delay())
-    {
-        return;
-    }
-
-    if (i2c_scan_loop())
-    {
-        return;
-    }
-    delay(1000);
-    i2c_scan_loop(true);
 }
 
 
-static bool boot_delay(const unsigned int delay_ms)
+static void init_serial(const unsigned int baud, const unsigned int usb_timeout, const unsigned int usb_delay)
 {
-#if DEBUG
-    static unsigned long t_boot = millis();
+    Serial.begin(baud);
 
-    if ((millis() - t_boot) < delay_ms)
+#if ARDUINO_USB_MODE
+    /* Wait for USB CDC serial connection to open on boards with native USB (otherwise this is immediately true),
+     * but use a timeout to prevent blocking if the USB is not attached at all. */
+    for (const unsigned int t_start = millis(); (millis() - t_start) < usb_timeout;)
     {
-        return true;
+        if (Serial)
+        {
+            /* Wait a bit more for the monitor to open the serial port (~250 ms seems to work well) */
+            if (usb_delay > 0)
+            {
+                delay(usb_delay);
+            }
+            break;
+        }
     }
-#endif
-    return false;
+#endif /* ARDUINO_USB_MODE */
 }
 
-
-static bool i2c_scan_loop(const bool reset)
+static void init_i2c(uint8_t scl, uint8_t sda, uint32_t frequency, bool scan)
 {
-    static uint8_t address = 0;
+    Wire.begin(sda, scl, frequency);
 
-    if (reset)
+    if (scan)
     {
-        address = 0;
-    }
+        printf("I2C scan...\n");
 
-    if (address == 0)
-    {
-        Serial.print("I2C scan...\n");
-    }
-    else if (address >= 127)
-    {
-        return false;
-    }
+        for (uint8_t address = 0; address <= (0xFF >> 1); address++)
+        {
+            Wire.beginTransmission(address);
+            if (Wire.endTransmission() == 0)
+            {
+                printf("I2C device found at 0x%02x\n", address);
+            }
+        }
 
-    Wire.beginTransmission(address);
-    if (Wire.endTransmission() == 0)
-    {
-        Serial.printf("I2C device found at 0x%02x ", address);
+        printf("I2C scan done\n");
     }
-    address++;
-
-    if (address >= 127)
-    {
-        Serial.print("I2C scan done\n");
-        return false;
-    }
-
-    return true;
 }
