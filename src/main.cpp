@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <Wire.h>
+#include "imu.hpp"
 
 
 /**
@@ -23,14 +24,50 @@ static void init_serial(unsigned int baud = 921600, unsigned int usb_timeout = 1
 static void init_i2c(uint8_t scl, uint8_t sda, uint32_t frequency, bool scan = false);
 
 
+/** IMU sensor instance */
+static IMU imu;
+
+
 void setup()
 {
     init_serial();
     init_i2c(44, 43, 400000, true);
+
+    imu.begin();
+#ifdef DEBUG
+    imu.printSensorTable();
+#endif
+    imu.enableSensor(IMU::OrientationSensor::ROTATION_VECTOR, 1);
+
+    printf("Setup complete\n");
 }
 
 void loop()
 {
+    static uint32_t t_last_imu = 0;
+    const uint32_t t_now = millis(); /*< Ensure everything in this loop iteration is in the same "tick" */
+
+    /* Handle pending sensor data */
+    imu.handle();
+
+    if (Serial.available() && Serial.read() == 't')
+    {
+        printf("Taring IMU\n");
+        imu.tareNow(false, SH2_TARE_BASIS_ROTATION_VECTOR);
+    }
+
+    /* Process */
+
+    if ((t_now - t_last_imu) >= 100)
+    {
+        float yaw, pitch, roll;
+        t_last_imu = t_now;
+
+        if (imu.getEuler(yaw, pitch, roll))
+        {
+            printf("Euler angles: %f, %f, %f\n", yaw, pitch, roll);
+        }
+    }
 }
 
 
