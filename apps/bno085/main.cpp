@@ -3,15 +3,8 @@
 #include "imu.hpp"
 
 
-/**
- * Initialize the serial port for `printf` usage
- *
- * @param baud        Baud rate for the serial port.
- * @param usb_timeout Timeout in milliseconds to wait for the USB CDC serial connection to open
- *                    on boards with native USB (otherwise this is ignored).
- * @param usb_delay   Delay in milliseconds to wait after the USB CDC serial connection is open.
- */
-static void init_serial(unsigned int baud = 921600, unsigned int usb_timeout = 1000, unsigned int usb_delay = 300);
+/** Initialize the serial port for `printf` usage */
+static void init_serial();
 
 /**
  * Initialize the I2C bus and optionally scan it for attached devices
@@ -71,22 +64,23 @@ void loop()
 }
 
 
-static void init_serial(const unsigned int baud, const unsigned int usb_timeout, const unsigned int usb_delay)
+static void init_serial()
 {
-    Serial.begin(baud);
+    /* Use `build_flags = -D MONITOR_SPEED=${this.monitor_speed}` from platformio.ini,
+     * so that the baud rate is always set to the same value in both places. */
+    Serial.begin(MONITOR_SPEED);
 
 #if ARDUINO_USB_MODE
-    /* Wait for USB CDC serial connection to open on boards with native USB (otherwise this is immediately true),
-     * but use a timeout to prevent blocking if the USB is not attached at all. */
-    for (const unsigned int t_start = millis(); (millis() - t_start) < usb_timeout;)
+     /* Wait for USB peripheral to enumerate, and USB CDC serial connection to
+      * open on boards with native USB (otherwise Serial is immediately true),
+      * but use a timeout to prevent blocking if the USB is not attached at all. */
+    for (const unsigned int t_start = millis(); (millis() - t_start) < 1000;)
     {
         if (Serial)
         {
-            /* Wait a bit more for the monitor to open the serial port (~250 ms seems to work well) */
-            if (usb_delay > 0)
-            {
-                delay(usb_delay);
-            }
+            /* Wait a bit more for the monitor to open the serial port
+             * (~250 ms seems to work well on few tested computers). */
+            delay(300);
             break;
         }
     }
