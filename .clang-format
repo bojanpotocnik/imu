@@ -1,0 +1,64 @@
+BasedOnStyle: LLVM
+# This file only specifies options that are different from the LLVM style defaults
+
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: true
+  AfterControlStatement: MultiLine
+  AfterExternBlock: true
+  AfterFunction: true
+  AfterNamespace: true
+  BeforeCatch: true
+  BeforeElse: true
+  SplitEmptyNamespace: true
+AlwaysBreakTemplateDeclarations: Yes
+
+AllowShortBlocksOnASingleLine: Always
+#AllowShortCaseExpressionOnASingleLine: true - not yet supported
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: InlineOnly
+AllowShortIfStatementsOnASingleLine: AllIfsAndElse
+AllowShortLoopsOnASingleLine: true
+
+AlignArrayOfStructures: Left
+AlignConsecutiveAssignments:
+  Enabled: true
+  AcrossComments: true
+  AlignCompound: true
+  PadOperators: true
+AlignConsecutiveBitFields:
+  Enabled: true
+  AcrossEmptyLines: true
+  AcrossComments: true
+AlignConsecutiveMacros:
+  Enabled: true
+  AcrossComments: true
+AlignConsecutiveShortCaseStatements:
+  Enabled: true
+  AcrossEmptyLines: true
+  AcrossComments: true
+
+NamespaceIndentation: All
+IndentCaseLabels: true
+
+AlignOperands: AlignAfterOperator
+
+ExperimentalAutoDetectBinPacking: true
+#BinPackArguments: false
+#BinPackParameters: false
+
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 2
+
+PackConstructorInitializers: NextLine
+
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 2
+
+AccessModifierOffset: -4
+IndentWidth: 4
+TabWidth: 4
+
+ColumnLimit: 100
+CommentPragmas: '\(http.+\)'

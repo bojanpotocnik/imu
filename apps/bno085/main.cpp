@@ -1,6 +1,6 @@
+#include "imu.hpp"
 #include <Arduino.h>
 #include <Wire.h>
-#include "imu.hpp"
 
 
 /** Initialize the serial port for `printf` usage */
@@ -38,26 +38,24 @@ void setup()
 void loop()
 {
     static uint32_t t_last_imu = 0;
-    const uint32_t t_now = millis(); /*< Ensure everything in this loop iteration is in the same "tick" */
+    /* Ensure everything in this loop iteration is in the same "tick" */
+    const uint32_t t_now       = millis();
 
     /* Handle pending sensor data */
     imu.handle();
 
-    if (Serial.available() && Serial.read() == 't')
-    {
+    if (Serial.available() && Serial.read() == 't') {
         printf("Taring IMU\n");
         imu.tareNow(false, SH2_TARE_BASIS_ROTATION_VECTOR);
     }
 
     /* Process */
 
-    if ((t_now - t_last_imu) >= 100)
-    {
+    if ((t_now - t_last_imu) >= 100) {
         float yaw, pitch, roll;
         t_last_imu = t_now;
 
-        if (imu.getEuler(yaw, pitch, roll))
-        {
+        if (imu.getEuler(yaw, pitch, roll)) {
             printf("Euler angles: %f, %f, %f\n", yaw, pitch, roll);
         }
     }
@@ -71,13 +69,11 @@ static void init_serial()
     Serial.begin(MONITOR_SPEED);
 
 #if ARDUINO_USB_MODE
-     /* Wait for USB peripheral to enumerate, and USB CDC serial connection to
-      * open on boards with native USB (otherwise Serial is immediately true),
-      * but use a timeout to prevent blocking if the USB is not attached at all. */
-    for (const unsigned int t_start = millis(); (millis() - t_start) < 1000;)
-    {
-        if (Serial)
-        {
+    /* Wait for USB peripheral to enumerate, and USB CDC serial connection to
+     * open on boards with native USB (otherwise Serial is immediately true),
+     * but use a timeout to prevent blocking if the USB is not attached at all. */
+    for (const unsigned int t_start = millis(); (millis() - t_start) < 1000;) {
+        if (Serial) {
             /* Wait a bit more for the monitor to open the serial port
              * (~250 ms seems to work well on few tested computers). */
             delay(300);
@@ -91,15 +87,12 @@ static void init_i2c(uint8_t scl, uint8_t sda, uint32_t frequency, bool scan)
 {
     Wire.begin(sda, scl, frequency);
 
-    if (scan)
-    {
+    if (scan) {
         printf("I2C scan...\n");
 
-        for (uint8_t address = 0; address <= (0xFF >> 1); address++)
-        {
+        for (uint8_t address = 0; address <= (0xFF >> 1); address++) {
             Wire.beginTransmission(address);
-            if (Wire.endTransmission() == 0)
-            {
+            if (Wire.endTransmission() == 0) {
                 printf("I2C device found at 0x%02x\n", address);
             }
         }
