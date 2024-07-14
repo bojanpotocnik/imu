@@ -12,19 +12,24 @@ static void on_iis_receive(int num_bytes);
 static void on_iis_request();
 
 
+// Note: use crossover cables (TX/RX swapped on one end, so that TX goes to RX and vice versa)
 static std::array<UART, 3> uarts = {
-    UART(2, 1, 1500000),            //< UART connected to RX=D1, TX=D0
-    UART(4, 3, 1500000),            //< UART connected to RX=D3, TX=D2
-    UART(44, 43, 1500000)           //< UART connected to RX=D7, TX=D6
+    UART(7, 44, 1500000), //< UART0 (RX=D8, TX=D7)
+    UART(3, 2, 1500000),  //< UART1 (RX=D2, TX=D1)
+    UART(5, 4, 1500000),  //< UART2 (RX=D4, TX=D3)
 };
 
-static I2C iim = I2C(5, 6, 400000); //< I2C master connected to SDA=D4, SCL=D5
-static I2C iis = I2C(7, 8, 0x69, on_iis_receive, on_iis_request);   //< I2C slave with address 0x69 connected to SDA=D8, SCL=D9
+// Note: use normal cables (SDA goes to SDA, SCL to SCL)
+static I2C iim = I2C(9, 8, 400000);   //< I2C master connected to SDA=D10, SCL=D9
+static I2C iis = I2C(6, 43, 0x69, on_iis_receive,
+                     on_iis_request); //< I2C slave with address 0x69 connected to SDA=D5, SCL=D6
 
 
 void setup()
 {
     init_printf();
+
+    pinMode(1, INPUT_PULLDOWN); // GPIO1 (D0) is connected to the optional 1.27 mm pin header
 
     for (auto &uart : uarts) {
         uart.init();
