@@ -3,4 +3,5 @@
 
 // Define static variables outside the class definition
 constexpr uint8_t UART::instances[];
-uint8_t UART::total_instances = 0;
+// Skip UART0, which also prints debug messages
+uint8_t UART::total_instances = 1;

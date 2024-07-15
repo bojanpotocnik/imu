@@ -13,8 +13,8 @@ static void on_iis_request();
 
 
 // Note: use crossover cables (TX/RX swapped on one end, so that TX goes to RX and vice versa)
-static std::array<UART, 3> uarts = {
-    UART(7, 44, 1500000), //< UART0 (RX=D8, TX=D7)
+static std::array<UART, 2> uarts = {
+    // UART0 (RX=D8, TX=D7) also prints debug messages, so avoid it for now
     UART(3, 2, 1500000),  //< UART1 (RX=D2, TX=D1)
     UART(5, 4, 1500000),  //< UART2 (RX=D4, TX=D3)
 };
