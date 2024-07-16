@@ -28,8 +28,11 @@ public:
      * Initialize the IMX sensor driver
      *
      * This disables all sensor data broadcasts.
+     *
+     * @return `true` if the initialization was successful, `false` otherwise
+     *         (error is logged internally).
      */
-    void init();
+    bool init();
 
     /**
      * Process incoming data from the IMU
@@ -50,9 +53,11 @@ private:
     uint8_t rx_buffer[PKT_BUF_SIZE] = {};
     /** Inertial Sense SDK communication instance */
     is_comm_instance_t comm         = {};
+    /** Last received data ID */
+    eDataIDs last_rx_did            = DID_NULL;
 
     /** Current sensor configuration saved in flash */
-    nvm_flash_cfg_t flash_cfg       = {};
+    nvm_flash_cfg_t flash_cfg = {};
 
     /**
      * Inertial Sense SDK callback to write data to the serial port
@@ -72,7 +77,7 @@ private:
      * This behaves as normal memory copy when `getData(offset=0, size=0)` is used,
      * but copies only the new data when offset and size are specified.
      */
-    template<typename T>
+    template <typename T>
     static void copyDataToStruct(T &dataset_data, const p_data_t *data);
 
     /**
@@ -82,10 +87,18 @@ private:
      * @param interval  How often the data shall be sent from the sensor, in multiples
      *                  of the sensor's internal data source update rate, or
      *                  0 for a one-time message and turn off.
-     * @param offset    Offset into data structure to request, or 0 for entire data structure.
-     * @param size      Length of data from offset to request, or 0 for entire data structure.
+     * @param timeout   If not 0, the time in milliseconds to wait for the response.
+     *                  If `period_ms` is non-zero, only the first response is waited for.
+     * @param offset    Offset into data structure to request, or
+     *                  0 for entire data structure (or up to `size` bytes).
+     * @param size      Length of data from `offset` to request, or
+     *                  0 for the entire remaining structure data.
+     *
+     * @return `true` if the request was sent successfully, `false` otherwise
+     *         (error is logged internally).
      */
-    void getData(eDataIDs did, uint32_t interval = 0, unsigned int offset = 0, size_t size = 0);
+    bool getData(eDataIDs did, uint32_t interval = 0, uint32_t timeout = 0,
+                 unsigned int offset = 0, size_t size = 0);
 
     /** Handle a received packet of type `ptype` */
     void handlePacket(protocol_type_t ptype);

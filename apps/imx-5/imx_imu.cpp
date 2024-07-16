@@ -4,21 +4,43 @@ static_assert(sizeof(double) == 8, "Inertial Sense SDK requires 64 bit double su
 static_assert(sizeof(int) >= sizeof(uintptr_t),
               "Successful cast of IMX pointer to int cannot be guaranteed");
 
-void IMX::init()
+bool IMX::init()
 {
     // Initialize comm interface - call this before doing any comm functions
     is_comm_init(&comm, rx_buffer, sizeof(rx_buffer));
 
+    if (!getData(DID_FLASH_CONFIG, 0, 500)) {
+        return false;
+    }
+
     // Stop all the broadcasts on the device
     is_comm_stop_broadcasts_all_ports(commPortWrite, reinterpret_cast<int>(this), &comm);
 
-    getData(DID_FLASH_CONFIG);
+    return true;
 }
 
-void IMX::getData(eDataIDs did, uint32_t interval, unsigned int offset, size_t size)
+bool IMX::getData(eDataIDs did, uint32_t interval, uint32_t timeout, unsigned int offset,
+                  size_t size)
 {
     is_comm_get_data(commPortWrite, reinterpret_cast<int>(this), &comm, did, offset, size,
                      interval);
+
+    if (timeout > 0) {
+        const auto start = millis();
+
+        while ((millis() - start) < timeout) {
+            last_rx_did = DID_NULL;
+            loop();
+            if (last_rx_did == did) {
+                log_d("DID %d response received in %d ms", did, millis() - start);
+                return true;
+            }
+        }
+        log_e("DID %d response timeout %d ms", did, timeout);
+        return false;
+    }
+
+    return true;
 }
 
 int IMX::commPortWrite(int this_ptr, const uint8_t *buf, int len)
@@ -139,10 +161,10 @@ void IMX::handlePacketParseError(eParseErrorType err_type) const
 
 void IMX::handlePacketISB(const p_data_t &data)
 {
-    const auto did = static_cast<eDataIDs>(data.hdr.id);
+    last_rx_did = static_cast<eDataIDs>(data.hdr.id);
 
     // TODO: Implement parsing of ISB data packets
-    switch (did) {
+    switch (last_rx_did) {
         case DID_NULL: {
             break;
         }
@@ -152,6 +174,6 @@ void IMX::handlePacketISB(const p_data_t &data)
                   flash_cfg.startupNavDtMs, flash_cfg.startupGPSDtMs);
             break;
         }
-        default: log_e("Unhandled ISB DID %d", did); break;
+        default: log_e("Unhandled ISB DID %d", last_rx_did); break;
     }
 }
