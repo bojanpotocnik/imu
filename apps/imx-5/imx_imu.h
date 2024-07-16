@@ -53,7 +53,9 @@ private:
     uint8_t rx_buffer[PKT_BUF_SIZE] = {};
     /** Inertial Sense SDK communication instance */
     is_comm_instance_t comm         = {};
-    /** Last received data ID */
+    /** Last received positive or negative acknowledgement packet type */
+    eISBPacketFlags last_rx_ack     = PKT_TYPE_INVALID;
+    /** Last received ISB DATA packet data ID */
     eDataIDs last_rx_did            = DID_NULL;
 
     /** Current sensor configuration saved in flash */
@@ -70,6 +72,29 @@ private:
      * @return The number of bytes written.
      */
     static int commPortWrite(int this_ptr, const uint8_t *buf, int len);
+
+    /**
+     * Send an InertialSense binary (ISB) packet
+     *
+     * @param pkt_type   ISB packet flags which include the packet type.
+     * @param did        ISB data ID.
+     * @param timeout    Time in milliseconds to wait for a response, or 0 to not wait.
+     * @param data       Pointer to payload data.
+     * @param data_size  Size in bytes of the payload data.
+     * @param offset     Offset of the payload data into the data set structure.
+     *
+     * @return `true` if the packet was sent successfully, `false` otherwise
+     *         (error is logged internally).
+     */
+    bool write(eISBPacketFlags pkt_type, eDataIDs did, uint16_t timeout, void *data = nullptr,
+               uint16_t offset = 0, uint16_t data_size = 0);
+    template <typename T>
+    bool write(eISBPacketFlags pkt_type, eDataIDs did, uint16_t timeout, T &data,
+               uint16_t offset = 0, uint16_t data_size = sizeof(T));
+    bool write(eISBPacketFlags pkt_type, uint16_t timeout);
+
+    bool waitAck(uint16_t timeout);
+    bool waitIsbDid(eDataIDs did, uint16_t timeout);
 
     /**
      * Copy only new received data to the destination structure
@@ -97,11 +122,11 @@ private:
      * @return `true` if the request was sent successfully, `false` otherwise
      *         (error is logged internally).
      */
-    bool getData(eDataIDs did, uint32_t interval = 0, uint32_t timeout = 0,
-                 unsigned int offset = 0, size_t size = 0);
+    bool getData(eDataIDs did, uint16_t interval = 0, uint16_t timeout = 0, unsigned int offset = 0,
+                 size_t size = 0);
 
-    /** Handle a received packet of type `ptype` */
-    void handlePacket(protocol_type_t ptype);
+    /** Handle a received `ptype` packet of protocol `pro_type` */
+    void handlePacket(eISBPacketFlags pkt_type, protocol_type_t pro_type);
     /** Handle packet parsing failure */
     void handlePacketParseError(eParseErrorType err_type) const;
     /** Handle InertialSense binary (ISB) packet */
