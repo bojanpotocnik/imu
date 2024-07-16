@@ -11,6 +11,14 @@ void IMX::init()
 
     // Stop all the broadcasts on the device
     is_comm_stop_broadcasts_all_ports(commPortWrite, reinterpret_cast<int>(this), &comm);
+
+    getData(DID_FLASH_CONFIG);
+}
+
+void IMX::getData(eDataIDs did, uint32_t interval, unsigned int offset, size_t size)
+{
+    is_comm_get_data(commPortWrite, reinterpret_cast<int>(this), &comm, did, offset, size,
+                     interval);
 }
 
 int IMX::commPortWrite(int this_ptr, const uint8_t *buf, int len)
@@ -19,6 +27,14 @@ int IMX::commPortWrite(int this_ptr, const uint8_t *buf, int len)
 
     return static_cast<int>(obj->uart.write(buf, len));
 }
+
+template <typename T>
+void IMX::copyDataToStruct(T &dataset_data, const p_data_t *data)
+{
+    const int r = copyDataPToStructP(&dataset_data, data, sizeof(dataset_data));
+    assert(r == 0);
+}
+
 
 void IMX::loop()
 {
@@ -59,7 +75,7 @@ void IMX::handlePacket(protocol_type_t ptype)
             // Inertial Sense binary command (PID_GET_DATA, PID_STOP_BROADCASTS...) packet
         case _PTYPE_INERTIAL_SENSE_DATA: {
             // Inertial Sense binary data (PID_SET_DATA, PID_DATA) packet
-            handlePacketISB(comm.rxPkt.dataHdr.id, comm.rxPkt.data);
+            handlePacketISB(p_data_t{.hdr = comm.rxPkt.dataHdr, .ptr = comm.rxPkt.data.ptr});
             break;
         }
         case _PTYPE_NMEA: {
@@ -121,11 +137,21 @@ void IMX::handlePacketParseError(eParseErrorType err_type) const
           comm.rxPktCount, comm.rxErrorCount);
 }
 
-void IMX::handlePacketISB(eDataIDs did, const bufPtr_t &payload)
+void IMX::handlePacketISB(const p_data_t &data)
 {
+    const auto did = static_cast<eDataIDs>(data.hdr.id);
+
     // TODO: Implement parsing of ISB data packets
     switch (did) {
-        case DID_NULL: break;
-        default:       log_e("Unhandled ISB DID %d", did); break;
+        case DID_NULL: {
+            break;
+        }
+        case DID_FLASH_CONFIG: {
+            copyDataToStruct(flash_cfg, &data);
+            log_d("IMU=%d ms, Nav=%d ms, GPS=%d ms", flash_cfg.startupImuDtMs,
+                  flash_cfg.startupNavDtMs, flash_cfg.startupGPSDtMs);
+            break;
+        }
+        default: log_e("Unhandled ISB DID %d", did); break;
     }
 }

@@ -26,6 +26,8 @@ public:
 
     /**
      * Initialize the IMX sensor driver
+     *
+     * This disables all sensor data broadcasts.
      */
     void init();
 
@@ -49,6 +51,9 @@ private:
     /** Inertial Sense SDK communication instance */
     is_comm_instance_t comm         = {};
 
+    /** Current sensor configuration saved in flash */
+    nvm_flash_cfg_t flash_cfg       = {};
+
     /**
      * Inertial Sense SDK callback to write data to the serial port
      *
@@ -61,12 +66,33 @@ private:
      */
     static int commPortWrite(int this_ptr, const uint8_t *buf, int len);
 
+    /**
+     * Copy only new received data to the destination structure
+     *
+     * This behaves as normal memory copy when `getData(offset=0, size=0)` is used,
+     * but copies only the new data when offset and size are specified.
+     */
+    template<typename T>
+    static void copyDataToStruct(T &dataset_data, const p_data_t *data);
+
+    /**
+     * Send a request to the IMX sensor to start streaming data
+     *
+     * @param did       The data ID to request (see `DID_*` from `data_sets.h`).
+     * @param interval  How often the data shall be sent from the sensor, in multiples
+     *                  of the sensor's internal data source update rate, or
+     *                  0 for a one-time message and turn off.
+     * @param offset    Offset into data structure to request, or 0 for entire data structure.
+     * @param size      Length of data from offset to request, or 0 for entire data structure.
+     */
+    void getData(eDataIDs did, uint32_t interval = 0, unsigned int offset = 0, size_t size = 0);
+
     /** Handle a received packet of type `ptype` */
     void handlePacket(protocol_type_t ptype);
     /** Handle packet parsing failure */
     void handlePacketParseError(eParseErrorType err_type) const;
     /** Handle InertialSense binary (ISB) packet */
-    void handlePacketISB(eDataIDs did, const bufPtr_t &payload);
+    void handlePacketISB(const p_data_t &data);
 };
 
 
