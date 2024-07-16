@@ -41,7 +41,7 @@ int IMX::commPortWrite(int this_ptr, const uint8_t *buf, int len)
     return static_cast<int>(obj->uart.write(buf, len));
 }
 
-bool IMX::write(eISBPacketFlags pkt_type, eDataIDs did, uint32_t timeout, void *data,
+bool IMX::write(eISBPacketFlags pkt_type, eDataIDs did, uint16_t timeout, void *data,
                 uint16_t offset, uint16_t data_size)
 {
     if (is_comm_write(commPortWrite, reinterpret_cast<int>(this), &comm, pkt_type, did, data_size,
@@ -131,16 +131,19 @@ void IMX::copyDataToStruct(T &dataset_data, const p_data_t *data)
 
 void IMX::loop()
 {
-    // Read data in chunks, to prevent the overhead of calling available() and read() for each byte
-    size_t nrx;
+    // Read data in chunks, to prevent the overhead of calling available() and read() for each byte.
+    // Only read a single chunk at once, to prevent this function blocking forever in case that
+    // the data is received faster than it can be processed.
+    size_t n_waiting = uart.available();
 
-    while ((nrx = uart.available()) > 0) {
+    while (n_waiting > 0) {
         const uint32_t now = millis();
         uint8_t buffer[sizeof(rx_buffer)];
 
-        nrx = uart.readBytes(buffer, std::min(nrx, sizeof(buffer)));
+        const auto n_read  = uart.readBytes(buffer, std::min(n_waiting, sizeof(buffer)));
+        n_waiting         -= n_read;
 
-        for (size_t n = 0; n < nrx; n++) {
+        for (size_t n = 0; n < n_read; n++) {
             const auto pro_type = is_comm_parse_byte_timeout(&comm, buffer[n], now);
 
             if (pro_type != _PTYPE_NONE) {
