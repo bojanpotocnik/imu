@@ -3,6 +3,7 @@
 
 #include "i2c.h"
 #include "uart.h"
+#include "imx_imu.h"
 
 
 /** Initialize the serial port for `printf` usage */
@@ -15,8 +16,8 @@ static void on_iis_request();
 // Note: use crossover cables (TX/RX swapped on one end, so that TX goes to RX and vice versa)
 static std::array<UART, 2> uarts = {
     // UART0 (RX=D8, TX=D7) also prints debug messages, so avoid it for now
-    UART(3, 2, 1500000),  //< UART1 (RX=D2, TX=D1)
-    UART(5, 4, 1500000),  //< UART2 (RX=D4, TX=D3)
+    UART(3, 2, 921600),  //< UART1 (RX=D2, TX=D1)
+    UART(5, 4, 921600),  //< UART2 (RX=D4, TX=D3)
 };
 
 // Note: use normal cables (SDA goes to SDA, SCL to SCL)
@@ -24,6 +25,8 @@ static I2C iim = I2C(9, 8, 400000);   //< I2C master connected to SDA=D10, SCL=D
 static I2C iis = I2C(6, 43, 0x69, on_iis_receive,
                      on_iis_request); //< I2C slave with address 0x69 connected to SDA=D5, SCL=D6
 
+/** IMX-5 IMU connected to UART1 */
+static IMX imx(uarts[0]);
 
 void setup()
 {
@@ -38,7 +41,9 @@ void setup()
     iim.init();
     iis.init();
 
-    printf("Setup complete\n");
+    imx.init();
+
+    log_i("Setup complete");
 }
 
 
@@ -49,35 +54,11 @@ void loop()
     const uint32_t t_now       = millis();
     const uint32_t t_now_u     = micros();
 
+    imx.loop();
+
     if ((t_now - t_last_imu) >= 1000) {
         t_last_imu = t_now;
         printf("t_now: %u ms, %u us\n", t_now, t_now_u);
-        for (auto &uart : uarts) {
-            uart.printf("[%u][%lu]\n", uart.instance, micros());
-        }
-
-        printf("I2C scan...\n");
-        for (uint8_t address = 0; address <= (0xFF >> 1); address++) {
-            iim.beginTransmission(address);
-            if (iim.endTransmission() == 0) {
-                printf("I2C device found at 0x%02x\n", address);
-            }
-        }
-        printf("I2C scan done\n");
-
-        iim.beginTransmission(0x69);
-        iim.write("Hm?");
-        uint8_t error = iim.endTransmission(false);
-        Serial.printf("endTransmission: %u\n", error);
-        uint8_t x = iim.requestFrom(0x69, 3);
-        printf("requestFrom: %u\n", x);
-    }
-
-    for (auto &uart : uarts) {
-        if (uart.available()) {
-            const auto rx = uart.readString();
-            uart.printf("[%u][%lu] '%s'\n", uart.instance, micros(), rx.c_str());
-        }
     }
 }
 
