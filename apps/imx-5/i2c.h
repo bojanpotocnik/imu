@@ -29,18 +29,21 @@ public:
      *
      * @param sda       SDA pin number.
      * @param scl       SCL pin number.
-     * @param freq_khz  Frequency of the I2C bus, in Hz..
+     * @param freq_khz  Frequency of the I2C bus, in Hz.
+     * @param timeout   Timeout in milliseconds for bus operations,
+     *                  used to prevent blocking in case of bus errors.
      *
      * @see TwoWire::TwoWire
      * @see TwoWire::begin
      */
-    I2C(int8_t sda, int8_t scl, uint32_t frequency = 400000)
+    I2C(int8_t sda, int8_t scl, uint32_t frequency = 400000, uint16_t timeout = 50)
         : TwoWire(instances[total_instances++]), frequency(frequency), address(0xFF)
     {
         assert(frequency > 1000); // Ensure that constructor with `address` is not mistakenly called
-        this->sda  = sda;
-        this->scl  = scl;
-        bufferSize = 256;
+        this->sda        = sda;
+        this->scl        = scl;
+        this->bufferSize = 256;
+        setTimeout(timeout);
     }
 
     /**
@@ -54,31 +57,36 @@ public:
      * @param on_receive  See OnReceive.
      * @param on_request  See OnRequest.
      * @param freq_khz    Frequency of the I2C bus, in Hz.
+     * @param timeout     Timeout in milliseconds for bus operations,
+     *                    used to prevent blocking in case of bus errors.
      *
      * @see TwoWire::TwoWire
      * @see TwoWire::begin
      */
     I2C(int8_t sda, int8_t scl, uint8_t address, OnReceive on_receive, OnRequest on_request,
-        uint32_t frequency = 400000)
+        uint32_t frequency = 400000, uint16_t timeout = 50)
         : TwoWire(instances[total_instances++]), frequency(frequency), address(address)
     {
-        this->sda  = sda;
-        this->scl  = scl;
-        bufferSize = 256;
+        this->sda        = sda;
+        this->scl        = scl;
+        this->bufferSize = 256;
+        setTimeout(timeout);
         onReceive(on_receive);
         onRequest(on_request);
     }
 
-
+    /** Initialize the I2C controller or peripheral driver */
     void init()
     {
-        bool ok = (address == 0xFF) ? TwoWire::begin(sda, scl, frequency)
-                                    : TwoWire::begin(address, sda, scl, frequency);
-        assert(ok);
-
-        setTimeOut(50);
+        if (address == 0xFF) {
+            assert(TwoWire::begin(sda, scl, frequency));
+            log_d("I2C-C/M (SDA=%d, SCL=%d, %d Hz) init OK", sda, scl, frequency);
+        }
+        else {
+            assert(TwoWire::begin(address, sda, scl, frequency));
+            log_d("I2C-P/S (0x%02x, SDA=%d, SCL=%d, %d Hz) init OK", address, sda, scl, frequency);
+        }
     }
-
 
 private:
     static constexpr uint8_t instances[] = {I2C_NUM_0, I2C_NUM_1};
