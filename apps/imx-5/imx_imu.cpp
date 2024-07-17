@@ -6,17 +6,32 @@ static_assert(sizeof(int) >= sizeof(uintptr_t),
 
 bool IMX::init()
 {
+    bool ok = false;
+
     // Initialize comm interface - call this before doing any comm functions
     is_comm_init(&comm, rx_buffer, sizeof(rx_buffer));
 
-    if (!(write(PKT_TYPE_STOP_BROADCASTS_ALL_PORTS, 100) && // Stop broadcasting all data
-          getData(DID_SYS_PARAMS, 0, 100) &&                // Read system parameters
-          getData(DID_FLASH_CONFIG, 0, 500)))               // Read configuration from flash
+    // If the sensor is currently streaming data a lot of data, the following command
+    // or the sensor response may be lost - send it multiple times until successful.
+    for (int i = 0; i < 10; i++) {
+        if (write(PKT_TYPE_STOP_BROADCASTS_ALL_PORTS, 100)) {
+            ok = true;
+            break;
+        }
+        is_comm_reset_parser(&comm);
+    }
+    if (!ok) {
+        log_e("Failed to stop broadcasts");
+        return false;
+    }
+
+    if (!(getData(DID_SYS_PARAMS, 0, 100) &&  // Read system parameters
+          getData(DID_FLASH_CONFIG, 0, 500))) // Read configuration from flash
     {
         return false;
     }
 
-    log_i("IMX init done");
+    log_i("IMX init OK");
     return true;
 }
 
@@ -120,6 +135,42 @@ bool IMX::waitIsbDid(eDataIDs did, uint16_t timeout)
 
     log_e("Timeout %d ms", timeout);
     return false;
+}
+
+bool IMX::enableData(IMX::DataSet data_set, uint16_t period_ms)
+{
+    const auto &cfg = d.flash_cfg;
+    uint32_t source_update_rate;
+    uint32_t period_multiple;
+    uint32_t period_ms_actual;
+
+    if ((cfg.startupNavDtMs <= 0) || (cfg.startupImuDtMs <= 0) || (cfg.startupGPSDtMs <= 0) ||
+        (cfg.startupImuDtMs > cfg.startupNavDtMs))
+    {
+        log_e("Invalid flash configuration (NavDtMs=%d, ImuDtMs=%d, GPSDtMs=%d)",
+              cfg.startupNavDtMs, cfg.startupImuDtMs, cfg.startupGPSDtMs);
+        return false;
+    }
+
+    switch (data_set) {
+        case DataSet::INS_AHRS_EULER: // fallthrough
+        case DataSet::INS_AHRS_QUAT:  source_update_rate = cfg.startupNavDtMs; break;
+        case DataSet::IMU:            source_update_rate = cfg.startupImuDtMs; break;
+        case DataSet::BAROMETER:      source_update_rate = 8; break;
+        case DataSet::MAGNETOMETER:   source_update_rate = 10; break;
+        default:                      source_update_rate = 1; break;
+    }
+
+    // Calculate the period-multiple value for the desired period (round up to prevent 0)
+    period_multiple = (period_ms + source_update_rate - 1) / source_update_rate;
+
+    period_ms_actual = period_multiple * source_update_rate;
+    if (period_ms_actual != period_ms) {
+        log_w("DID %d period %d ms rounded to %dx%d=%d ms", static_cast<int>(data_set), period_ms,
+              period_multiple, source_update_rate, period_ms_actual);
+    }
+
+    return getData(static_cast<eDataIDs>(data_set), period_multiple);
 }
 
 template <typename T>
@@ -244,19 +295,37 @@ void IMX::handlePacketParseError(eParseErrorType err_type) const
 void IMX::handlePacketISB(const p_data_t &data)
 {
     last_rx_did = static_cast<eDataIDs>(data.hdr.id);
+#ifdef DEBUG
     log_d("DID=%d", last_rx_did);
+#endif
 
-    // TODO: Implement parsing of ISB data packets
     switch (last_rx_did) {
         case DID_NULL: {
             break;
         }
-        case DID_FLASH_CONFIG: {
-            copyDataToStruct(flash_cfg, &data);
-            log_d("IMU=%d ms, Nav=%d ms, GPS=%d ms", flash_cfg.startupImuDtMs,
-                  flash_cfg.startupNavDtMs, flash_cfg.startupGPSDtMs);
+        case DID_DEV_INFO: {
+            copyDataToStruct(m_data.dev_info, &data);
             break;
         }
-        default: log_e("Unhandled ISB DID %d", last_rx_did); break;
+        case DID_SYS_PARAMS: {
+            copyDataToStruct(m_data.sys_params, &data);
+            break;
+        }
+        case DID_FLASH_CONFIG: {
+            copyDataToStruct(m_data.flash_cfg, &data);
+            break;
+        }
+        case DID_INS_1: {
+            copyDataToStruct(m_data.ins, &data);
+            break;
+        }
+        case DID_IMU: {
+            copyDataToStruct(m_data.imu, &data);
+            break;
+        }
+        default: {
+            log_e("Unhandled ISB DID %d", last_rx_did);
+            break;
+        }
     }
 }

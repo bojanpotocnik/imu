@@ -17,6 +17,41 @@
 class IMX
 {
 public:
+    using SensorData = struct {
+        dev_info_t dev_info;
+        nvm_flash_cfg_t flash_cfg;
+        sys_params_t sys_params;
+        ins_1_t ins;
+        imu_t imu;
+    };
+
+    /**
+     * Data sets available for streaming from the IMX sensor
+     *
+     * https://docs.inertialsense.com/user-manual/com-protocol/DID-descriptions/#data-sets-dids
+     */
+    enum class DataSet {
+        /** Inertial Navigation System (INS) and Attitude Heading Reference System (AHRS) in Euler
+           angles */
+        INS_AHRS_EULER = DID_INS_1,
+        /** Inertial Navigation System (INS) and Attitude Heading Reference System (AHRS) in
+           quaternions */
+        INS_AHRS_QUAT  = DID_INS_2,
+        /** Inertial Measurement Unit (IMU) data */
+        IMU            = DID_IMU,
+        /** Barometric pressure sensor data */
+        BAROMETER      = DID_BAROMETER,
+        /** Magnetometer sensor output */
+        MAGNETOMETER   = DID_MAGNETOMETER,
+        /** System sensor information */
+        SYSTEM         = DID_SYS_PARAMS,
+    };
+
+    /**
+     * The last received sensor data
+     */
+    const SensorData &d = m_data;
+
     /**
      * Construct a new Inertial Sense IMX sensor driver object
      *
@@ -24,10 +59,18 @@ public:
      */
     explicit IMX(UART &uart) : uart(uart) {}
 
+    // Prevent (accidental) copying instances of this class
+    IMX(const IMX &)            = delete;
+    IMX &operator=(const IMX &) = delete;
+    // Also prevent move, since it's not needed
+    IMX(IMX &&)                 = delete;
+    IMX &operator=(IMX &&)      = delete;
+
     /**
      * Initialize the IMX sensor driver
      *
-     * This disables all sensor data broadcasts.
+     * This disables all sensor data broadcasts, use `enableData` to enable reporting of specific
+     * data sets.
      *
      * @return `true` if the initialization was successful, `false` otherwise
      *         (error is logged internally).
@@ -35,16 +78,24 @@ public:
     bool init();
 
     /**
+     * Enable streaming of a specific data set from the IMX sensor
+     *
+     * @param data_set   The data set to enable streaming for.
+     * @param period_ms  The period in milliseconds at which to stream the data, or
+     *                   0 for a one-time message.
+     *                   Note that periodMs is rounded to the nearest multiple of the
+     *                   sensor's internal source update rate for a specific data set.
+     *                   https://docs.inertialsense.com/user-manual/com-protocol/isb/#data-source-update-rates
+     *
+     * @return `true` if the data set was enabled successfully, `false` otherwise
+     *         (error is logged internally).
+     */
+    bool enableData(DataSet data_set, uint16_t period_ms = 0);
+
+    /**
      * Process incoming data from the IMU
      */
     void loop();
-
-    // Prevent (accidental) copying instances of this class
-    IMX(const IMX &)            = delete;
-    IMX &operator=(const IMX &) = delete;
-    // Also prevent move, since it's not needed
-    IMX(IMX &&)                 = delete;
-    IMX &operator=(IMX &&)      = delete;
 
 private:
     /** UART instance for communication with the IMU */
@@ -58,8 +109,8 @@ private:
     /** Last received ISB DATA packet data ID */
     eDataIDs last_rx_did            = DID_NULL;
 
-    /** Current sensor configuration saved in flash */
-    nvm_flash_cfg_t flash_cfg = {};
+    /** Last received sensor data */
+    SensorData m_data = {};
 
     /**
      * Inertial Sense SDK callback to write data to the serial port

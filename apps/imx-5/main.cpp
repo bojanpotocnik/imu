@@ -42,6 +42,9 @@ void setup()
     iis.init();
 
     imx.init();
+    imx.enableData(IMX::DataSet::SYSTEM, 1000);
+    imx.enableData(IMX::DataSet::INS_AHRS_EULER, 20);
+    imx.enableData(IMX::DataSet::IMU, 50);
 
     log_i("Setup complete");
 }
@@ -58,7 +61,7 @@ void loop()
 
     if ((t_now - t_last_imu) >= 1000) {
         t_last_imu = t_now;
-        printf("t_now: %u ms, %u us\n", t_now, t_now_u);
+        log_i("IMU YPR %f %f %f", imx.d.ins.theta[2] * C_RAD2DEG_F, imx.d.ins.theta[1] * C_RAD2DEG_F, imx.d.ins.theta[0] * C_RAD2DEG_F);
     }
 }
 
