@@ -22,7 +22,6 @@ public:
         nvm_flash_cfg_t flash_cfg;
         sys_params_t sys_params;
         ins_1_t ins;
-        imu_t imu;
     };
 
     /**
@@ -51,6 +50,28 @@ public:
      * The last received sensor data
      */
     const SensorData &d = m_data;
+
+    class
+    {
+    public:
+        /** Minimum received values since last call to `reset()` */
+        imus_t min;
+        /** Maximum received values since last call to `reset()` */
+        imus_t max;
+        /** Last received IMU data */
+        imu_t last;
+
+        void reset()
+        {
+            for (int i = 0; i < 3; i++) {
+                min.acc[i] = std::numeric_limits<float>::max();
+                max.acc[i] = std::numeric_limits<float>::min();
+                min.pqr[i] = std::numeric_limits<float>::max();
+                max.pqr[i] = std::numeric_limits<float>::min();
+            }
+            last = {};
+        }
+    } imu{};
 
     /**
      * Construct a new Inertial Sense IMX sensor driver object

@@ -54,16 +54,22 @@ void loop()
 {
     int parsed = imx.loop();
     if (parsed > 0) {
-        log_i("IMU YPR 0x%x, %f %f %f deg, IMU 0x%0x %f %f %f m/s2, n=%d",
+        log_i("YPR 08%x, %6.1f %6.1f %6.1f deg || "
+              "IMU 08%x %5.1f/%5.1f | %5.1f/%5.1f | %5.1f/%5.1f m/s2 || "
+              "n=%d",
               imx.d.ins.insStatus,
               imx.d.ins.theta[2] * C_RAD2DEG_F,
               imx.d.ins.theta[1] * C_RAD2DEG_F,
               imx.d.ins.theta[0] * C_RAD2DEG_F,
-              imx.d.imu.status,
-              imx.d.imu.I.acc[0],
-              imx.d.imu.I.acc[1],
-              imx.d.imu.I.acc[2],
+              imx.imu.last.status,
+              imx.imu.min.acc[0],
+              imx.imu.max.acc[0],
+              imx.imu.min.acc[1],
+              imx.imu.max.acc[1],
+              imx.imu.min.acc[2],
+              imx.imu.max.acc[2],
               parsed);
+        imx.imu.reset();
     }
     else if (parsed < 0) {
         log_d("Parsed %d", parsed);
@@ -100,5 +106,6 @@ static void on_iis_receive(int num_bytes)
 static void on_iis_request()
 {
     printf("on_iis_request\n");
+
     iis.write("Hello!");
 }

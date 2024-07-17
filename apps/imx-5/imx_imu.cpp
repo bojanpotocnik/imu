@@ -31,6 +31,8 @@ bool IMX::init()
         return false;
     }
 
+    imu.reset();
+
     log_i("IMX init OK");
     return true;
 }
@@ -358,7 +360,17 @@ void IMX::handlePacketISB(const p_data_t &data)
             break;
         }
         case DID_IMU: {
-            copyDataToStruct(m_data.imu, &data);
+            copyDataToStruct(imu.last, &data);
+
+            // Update min/max values
+            const auto &imus = imu.last.I;
+            for (int i = 0; i < 3; i++) {
+                imu.max.acc[i] = std::max(imus.acc[i], imu.max.acc[i]);
+                imu.min.acc[i] = std::min(imus.acc[i], imu.min.acc[i]);
+                imu.max.pqr[i] = std::max(imus.pqr[i], imu.max.pqr[i]);
+                imu.min.pqr[i] = std::min(imus.pqr[i], imu.min.pqr[i]);
+            }
+
             break;
         }
         default: {
