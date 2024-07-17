@@ -94,20 +94,26 @@ public:
 
     /**
      * Process incoming data from the IMU
+     *
+     * @return If received UART data was processed, but no full packet was received,
+     *         the negative number representing number of bytes read from UART is returned.
+     *         If some packet was received, the positive number representing number of bytes
+     *         read from UART is returned.
+     *         If no data was received, 0 is returned.
      */
-    void loop();
+    int loop();
 
 private:
     /** UART instance for communication with the IMU */
     UART &uart;
     /** Buffer for incoming messages */
-    uint8_t rx_buffer[PKT_BUF_SIZE] = {};
+    uint8_t rx_buffer[2 * PKT_BUF_SIZE] = {};
     /** Inertial Sense SDK communication instance */
-    is_comm_instance_t comm         = {};
+    is_comm_instance_t comm             = {};
     /** Last received positive or negative acknowledgement packet type */
-    eISBPacketFlags last_rx_ack     = PKT_TYPE_INVALID;
+    eISBPacketFlags last_rx_ack         = PKT_TYPE_INVALID;
     /** Last received ISB DATA packet data ID */
-    eDataIDs last_rx_did            = DID_NULL;
+    eDataIDs last_rx_did                = DID_NULL;
 
     /** Last received sensor data */
     SensorData m_data = {};

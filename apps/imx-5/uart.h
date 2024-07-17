@@ -27,7 +27,7 @@ public:
      * @see HardwareSerial::HardwareSerial
      * @see HardwareSerial::begin
      */
-    UART(int8_t rx_pin, int8_t tx_pin, uint32_t baud, uint32_t rx_timeout = 100)
+    UART(int8_t rx_pin, int8_t tx_pin, uint32_t baud, uint32_t rx_timeout)
         : HardwareSerial(instances[total_instances]),
           pin_rx(rx_pin),
           pin_tx(tx_pin),
@@ -36,6 +36,14 @@ public:
     {
         // Increment instance count after initializing `HardwareSerial` and `instance`
         total_instances++;
+    }
+
+    UART(int8_t rx_pin, int8_t tx_pin, uint32_t baud, uint32_t rx_timeout, size_t rx_buffer_size,
+         size_t tx_buffer_size = 128)
+        : UART(rx_pin, tx_pin, baud, rx_timeout)
+    {
+        setRxBufferSize(rx_buffer_size);
+        setTxBufferSize(tx_buffer_size);
     }
 
     void init()

@@ -2,8 +2,8 @@
 #include <array>
 
 #include "i2c.h"
-#include "uart.h"
 #include "imx_imu.h"
+#include "uart.h"
 
 
 /** Initialize the serial port for `printf` usage */
@@ -16,8 +16,8 @@ static void on_iis_request();
 // Note: use crossover cables (TX/RX swapped on one end, so that TX goes to RX and vice versa)
 static std::array<UART, 2> uarts = {
     // UART0 (RX=D8, TX=D7) also prints debug messages, so avoid it for now
-    UART(3, 2, 921600),  //< UART1 (RX=D2, TX=D1)
-    UART(5, 4, 921600),  //< UART2 (RX=D4, TX=D3)
+    UART(3, 2, 921600, 1, 4096, 256), //< UART1 (RX=D2, TX=D1)
+    UART(5, 4, 921600, 100),          //< UART2 (RX=D4, TX=D3)
 };
 
 // Note: use normal cables (SDA goes to SDA, SCL to SCL)
@@ -43,8 +43,8 @@ void setup()
 
     imx.init();
     imx.enableData(IMX::DataSet::SYSTEM, 1000);
-    imx.enableData(IMX::DataSet::INS_AHRS_EULER, 20);
-    imx.enableData(IMX::DataSet::IMU, 50);
+    imx.enableData(IMX::DataSet::INS_AHRS_EULER, 10);
+    imx.enableData(IMX::DataSet::IMU, 1);
 
     log_i("Setup complete");
 }
@@ -52,16 +52,21 @@ void setup()
 
 void loop()
 {
-    static uint32_t t_last_imu = 0;
-    /* Ensure everything in this loop iteration is in the same "tick" */
-    const uint32_t t_now       = millis();
-    const uint32_t t_now_u     = micros();
-
-    imx.loop();
-
-    if ((t_now - t_last_imu) >= 1000) {
-        t_last_imu = t_now;
-        log_i("IMU YPR %f %f %f", imx.d.ins.theta[2] * C_RAD2DEG_F, imx.d.ins.theta[1] * C_RAD2DEG_F, imx.d.ins.theta[0] * C_RAD2DEG_F);
+    int parsed = imx.loop();
+    if (parsed > 0) {
+        log_i("IMU YPR 0x%x, %f %f %f deg, IMU 0x%0x %f %f %f m/s2, n=%d",
+              imx.d.ins.insStatus,
+              imx.d.ins.theta[2] * C_RAD2DEG_F,
+              imx.d.ins.theta[1] * C_RAD2DEG_F,
+              imx.d.ins.theta[0] * C_RAD2DEG_F,
+              imx.d.imu.status,
+              imx.d.imu.I.acc[0],
+              imx.d.imu.I.acc[1],
+              imx.d.imu.I.acc[2],
+              parsed);
+    }
+    else if (parsed < 0) {
+        log_d("Parsed %d", parsed);
     }
 }
 

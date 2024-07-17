@@ -143,6 +143,7 @@ bool IMX::enableData(IMX::DataSet data_set, uint16_t period_ms)
     uint32_t source_update_rate;
     uint32_t period_multiple;
     uint32_t period_ms_actual;
+    size_t d_size;
 
     if ((cfg.startupNavDtMs <= 0) || (cfg.startupImuDtMs <= 0) || (cfg.startupGPSDtMs <= 0) ||
         (cfg.startupImuDtMs > cfg.startupNavDtMs))
@@ -153,12 +154,40 @@ bool IMX::enableData(IMX::DataSet data_set, uint16_t period_ms)
     }
 
     switch (data_set) {
-        case DataSet::INS_AHRS_EULER: // fallthrough
-        case DataSet::INS_AHRS_QUAT:  source_update_rate = cfg.startupNavDtMs; break;
-        case DataSet::IMU:            source_update_rate = cfg.startupImuDtMs; break;
-        case DataSet::BAROMETER:      source_update_rate = 8; break;
-        case DataSet::MAGNETOMETER:   source_update_rate = 10; break;
-        default:                      source_update_rate = 1; break;
+        case DataSet::INS_AHRS_EULER: {
+            source_update_rate = cfg.startupNavDtMs;
+            d_size             = sizeof(ins_1_t);
+            break;
+        }
+        case DataSet::INS_AHRS_QUAT: {
+            source_update_rate = cfg.startupNavDtMs;
+            d_size             = sizeof(ins_2_t);
+            break;
+        }
+        case DataSet::IMU: {
+            source_update_rate = cfg.startupImuDtMs;
+            d_size             = sizeof(imu_t);
+            break;
+        }
+        case DataSet::BAROMETER: {
+            source_update_rate = 8;
+            d_size             = sizeof(barometer_t);
+            break;
+        }
+        case DataSet::MAGNETOMETER: {
+            source_update_rate = 10;
+            d_size             = sizeof(magnetometer_t);
+            break;
+        }
+        case DataSet::SYSTEM: {
+            source_update_rate = 1;
+            d_size             = sizeof(sys_params_t);
+            break;
+        }
+        default: {
+            log_e("Invalid data set %d", data_set);
+            return false;
+        }
     }
 
     // Calculate the period-multiple value for the desired period (round up to prevent 0)
@@ -168,6 +197,10 @@ bool IMX::enableData(IMX::DataSet data_set, uint16_t period_ms)
     if (period_ms_actual != period_ms) {
         log_w("DID %d period %d ms rounded to %dx%d=%d ms", static_cast<int>(data_set), period_ms,
               period_multiple, source_update_rate, period_ms_actual);
+    }
+    else {
+        log_i("DID %d every %d ms (%d Bps)", static_cast<int>(data_set), period_ms,
+              static_cast<int>(d_size * 1000.0f / period_ms_actual));
     }
 
     return getData(static_cast<eDataIDs>(data_set), period_multiple);
@@ -180,12 +213,14 @@ void IMX::copyDataToStruct(T &dataset_data, const p_data_t *data)
     assert(r == 0);
 }
 
-void IMX::loop()
+int IMX::loop()
 {
     // Read data in chunks, to prevent the overhead of calling available() and read() for each byte.
     // Only read a single chunk at once, to prevent this function blocking forever in case that
     // the data is received faster than it can be processed.
-    size_t n_waiting = uart.available();
+    const size_t n_available = uart.available();
+    size_t n_waiting         = n_available;
+    bool packet_parsed       = false;
 
     while (n_waiting > 0) {
         const uint32_t now = millis();
@@ -200,9 +235,12 @@ void IMX::loop()
             if (pro_type != _PTYPE_NONE) {
                 handlePacket(static_cast<eISBPacketFlags>(comm.rxPkt.flags & PKT_TYPE_MASK),
                              pro_type);
+                packet_parsed = true;
             }
         }
     }
+
+    return static_cast<int>(packet_parsed ? n_available : -n_available);
 }
 
 void IMX::handlePacket(eISBPacketFlags pkt_type, protocol_type_t pro_type)
