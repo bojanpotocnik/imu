@@ -22,9 +22,17 @@ static std::array<UART, 2> uarts = {
 };
 
 // Note: use normal cables (SDA goes to SDA, SCL to SCL)
-static I2C iim = I2C(9, 8, 400000);   //< I2C master connected to SDA=D10, SCL=D9
-static I2C iis = I2C(6, 43, 0x69, on_iis_receive,
-                     on_iis_request); //< I2C slave with address 0x69 connected to SDA=D5, SCL=D6
+#ifndef I2C_PERIPHERAL_ON_CONTROLLER_PORT
+static I2C iim = I2C(9, 8, 400000); //< I2C master connected to SDA=D10, SCL=D9
+#endif
+static I2C iis = I2C(
+#ifdef I2C_PERIPHERAL_ON_CONTROLLER_PORT
+    9, 8,
+#else
+    6, 43,
+#endif
+    0x69, on_iis_receive, on_iis_request, 400000,
+    500); //< I2C slave with address 0x69 connected to SDA=D5, SCL=D6
 
 /** IMX-5 IMU connected to UART1 */
 static IMX imx(uarts[0]);
@@ -48,7 +56,9 @@ void setup()
         uart.init();
     }
 
+#ifndef I2C_PERIPHERAL_ON_CONTROLLER_PORT
     iim.init();
+#endif
     iis.init();
 
     assert(imx_setup());
