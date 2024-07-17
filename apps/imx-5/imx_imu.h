@@ -73,6 +73,9 @@ public:
         }
     } imu{};
 
+    /** This flag is only set internally and can be read and cleared by the user */
+    bool timeoutOccurred = false;
+
     /**
      * Construct a new Inertial Sense IMX sensor driver object
      *
@@ -135,6 +138,10 @@ private:
     eISBPacketFlags last_rx_ack         = PKT_TYPE_INVALID;
     /** Last received ISB DATA packet data ID */
     eDataIDs last_rx_did                = DID_NULL;
+    /** The milliseconds timestamp when the last UART data was received */
+    uint32_t last_rx_timestamp          = 0;
+    /** Maximum allowed duration (ms) to wait for any UART data, or 0 to disable the timeout */
+    uint32_t rx_timeout                 = 0;
 
     /** Last received sensor data */
     SensorData m_data = {};

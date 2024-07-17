@@ -15,7 +15,8 @@ bool IMX::init()
     // or the sensor response may be lost - send it multiple times until successful.
     for (int i = 0; i < 10; i++) {
         if (write(PKT_TYPE_STOP_BROADCASTS_ALL_PORTS, 100)) {
-            ok = true;
+            rx_timeout = 0; // Broadcasts are stopped, so also disable the timeout
+            ok         = true;
             break;
         }
         is_comm_reset_parser(&comm);
@@ -205,6 +206,10 @@ bool IMX::enableData(IMX::DataSet data_set, uint16_t period_ms)
               static_cast<int>(d_size * 1000.0f / period_ms_actual));
     }
 
+    if ((rx_timeout == 0) || (rx_timeout > 2 * period_ms_actual)) {
+        rx_timeout = std::max(10u, 2 * period_ms_actual);
+    }
+
     return getData(static_cast<eDataIDs>(data_set), period_multiple);
 }
 
@@ -224,15 +229,28 @@ int IMX::loop()
     size_t n_waiting         = n_available;
     bool packet_parsed       = false;
 
+    // Only check for timeout if any previous one was processed
+    if ((n_available < 1) && (rx_timeout > 0) && !timeoutOccurred) {
+        const auto since_last_rx = millis() - last_rx_timestamp;
+
+        if (since_last_rx > rx_timeout) {
+            log_e("Timeout (%d > %d)", since_last_rx, rx_timeout);
+            is_comm_reset_parser(&comm);
+            timeoutOccurred = true;
+            return 0;
+        }
+    }
+
     while (n_waiting > 0) {
-        const uint32_t now = millis();
         uint8_t buffer[sizeof(rx_buffer)];
 
         const auto n_read  = uart.readBytes(buffer, std::min(n_waiting, sizeof(buffer)));
         n_waiting         -= n_read;
 
         for (size_t n = 0; n < n_read; n++) {
+            const auto now      = millis();
             const auto pro_type = is_comm_parse_byte_timeout(&comm, buffer[n], now);
+            last_rx_timestamp   = now;
 
             if (pro_type != _PTYPE_NONE) {
                 handlePacket(static_cast<eISBPacketFlags>(comm.rxPkt.flags & PKT_TYPE_MASK),

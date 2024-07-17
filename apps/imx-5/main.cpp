@@ -28,6 +28,15 @@ static I2C iis = I2C(6, 43, 0x69, on_iis_receive,
 /** IMX-5 IMU connected to UART1 */
 static IMX imx(uarts[0]);
 
+
+static bool imx_setup()
+{
+    return imx.init() &&                                       // Initialization disables all data
+           imx.enableData(IMX::DataSet::SYSTEM, 1000) &&       // Temperature and other sensors
+           imx.enableData(IMX::DataSet::INS_AHRS_EULER, 10) && // AHRS at 100 Hz
+           imx.enableData(IMX::DataSet::IMU, 1);               // IMU data at 1000 Hz
+}
+
 void setup()
 {
     init_printf();
@@ -41,18 +50,23 @@ void setup()
     iim.init();
     iis.init();
 
-    imx.init();
-    imx.enableData(IMX::DataSet::SYSTEM, 1000);
-    imx.enableData(IMX::DataSet::INS_AHRS_EULER, 10);
-    imx.enableData(IMX::DataSet::IMU, 1);
+    assert(imx_setup());
 
-    log_i("Setup complete");
+    log_i("setup OK");
 }
 
 
 void loop()
 {
-    int parsed = imx.loop();
+    const int parsed = imx.loop();
+
+    if (imx.timeoutOccurred) {
+        if (!imx_setup()) {
+            return;
+        }
+        imx.timeoutOccurred = false;
+    }
+
     if (parsed > 0) {
         log_i("YPR 08%x, %6.1f %6.1f %6.1f deg || "
               "IMU 08%x %5.1f/%5.1f | %5.1f/%5.1f | %5.1f/%5.1f m/s2 || "
