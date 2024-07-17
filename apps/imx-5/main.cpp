@@ -3,6 +3,7 @@
 
 #include "i2c.h"
 #include "imx_imu.h"
+#include "ins.h"
 #include "uart.h"
 
 
@@ -68,7 +69,7 @@ void loop()
     }
 
     if (parsed > 0) {
-        log_i("YPR 08%x, %6.1f %6.1f %6.1f deg || "
+        log_d("YPR 08%x, %6.1f %6.1f %6.1f deg || "
               "IMU 08%x %5.1f/%5.1f | %5.1f/%5.1f | %5.1f/%5.1f m/s2 || "
               "n=%d",
               imx.d.ins.insStatus,
@@ -83,10 +84,9 @@ void loop()
               imx.imu.min.acc[2],
               imx.imu.max.acc[2],
               parsed);
-        imx.imu.reset();
     }
     else if (parsed < 0) {
-        log_d("Parsed %d", parsed);
+        log_v("Parsed %d", parsed);
     }
 }
 
@@ -114,12 +114,30 @@ static void init_printf()
 
 static void on_iis_receive(int num_bytes)
 {
-    printf("on_iis_receive(%d)\n", num_bytes);
+    log_v("I2C-C sent %d B", num_bytes);
 }
 
 static void on_iis_request()
 {
-    printf("on_iis_request\n");
+    log_v("I2C-C requesting data");
 
-    iis.write("Hello!");
+    INS::sensor_data_t data{
+        .hdwStatus = imx.d.ins.hdwStatus,
+        .imuStatus = imx.imu.last.status,
+        .insStatus = imx.d.ins.insStatus,
+        .ahrs{.yaw   = imx.d.ins.theta[2] * C_RAD2DEG_F,
+              .pitch = imx.d.ins.theta[1] * C_RAD2DEG_F,
+              .roll  = imx.d.ins.theta[0] * C_RAD2DEG_F},
+        .accel{.min{.x = imx.imu.min.acc[0], .y = imx.imu.min.acc[1], .z = imx.imu.min.acc[2]},
+              .max{.x = imx.imu.max.acc[0], .y = imx.imu.max.acc[1], .z = imx.imu.max.acc[2]}}
+    };
+    imx.imu.reset();
+
+    const size_t n_w = iis.write(reinterpret_cast<uint8_t *>(&data), sizeof(data));
+    if (n_w != sizeof(data)) {
+        log_e("Wrote %d of %d B", n_w, sizeof(data));
+    }
+    else {
+        log_v("Wrote %d", n_w);
+    }
 }

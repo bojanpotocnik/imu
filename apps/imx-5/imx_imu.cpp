@@ -32,6 +32,17 @@ bool IMX::init()
         return false;
     }
 
+    // The Sensor Frame was rotated for -90° around the Z axis to get the correct
+    // pitch/roll based on how the sensor is mounted on the robot.
+    // Read more at:
+    //   https://docs.inertialsense.com/user-manual/reference/coordinate_frames/#hardware-frame
+    //   https://docs.inertialsense.com/user-manual/application-config/imu_ins_gnss_configuration/#coordinate-frame-relationship
+    const uint8_t sensor_rotation = (d.flash_cfg.sensorConfig & SENSOR_CFG_SENSOR_ROTATION_MASK) >>
+                                    SENSOR_CFG_SENSOR_ROTATION_OFFSET;
+    if (sensor_rotation != SENSOR_CFG_SENSOR_ROTATION_0_0_N90) {
+        log_e("Invalid sensor rotation %d != %d", sensor_rotation);
+    }
+
     imu.reset();
 
     log_i("IMX init OK");
@@ -207,7 +218,7 @@ bool IMX::enableData(IMX::DataSet data_set, uint16_t period_ms)
     }
 
     if ((rx_timeout == 0) || (rx_timeout > 2 * period_ms_actual)) {
-        rx_timeout = std::max(10u, 2 * period_ms_actual);
+        rx_timeout = std::max(1000u, 2 * period_ms_actual);
     }
 
     return getData(static_cast<eDataIDs>(data_set), period_multiple);
