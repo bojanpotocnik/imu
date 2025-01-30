@@ -2,3 +2,10 @@
 .idea/
 # PlatformIO IDE or plugin
 .pio/
+
+# KiCAD PCB files
+Hardware/PCB/*/*-backups
+Hardware/PCB/*/#auto*#
+Hardware/PCB/*/_autosave*
+Hardware/PCB/*/*-cache
+Hardware/PCB/*/~*
